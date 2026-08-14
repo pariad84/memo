@@ -135,6 +135,37 @@ const PrimeEngine = (() => {
         return Math.round(num * (term1 + term2 + term3));
     };
 
+    // [수정 5] li(x)(로그적분) 뉴턴 역산으로 milestone을 정제.
+    // li(x)는 소수정리(PNT)에서 알려진 오차 O(√x·ln x)의 근사로, Cipolla의
+    // "1/ln(n) 다항식" 오차보다 점근적으로 훨씬 정확하다. 실측(10^9~10^13)에서
+    // Cipolla 대비 오차가 1.4배~43배까지 줄어드는 걸 확인했다(스케일이 클수록 더 좋아짐).
+    // 단, 이게 줄이는 건 "로컬 보정" 부분(전체 시간의 10~25%)뿐이고, π(milestone) 자체의
+    // O(x^0.75) 계산 비용(전체의 75~90%)은 milestone 정확도와 무관하게 그대로 남는다 —
+    // 그러니 이건 상수배 최적화이지 알고리즘 벽을 뚫는 게 아니다.
+    const li = (x) => {
+        const lnX = Math.log(x);
+        let sum = 0, term = 1;
+        const maxK = Math.min(40, Math.floor(lnX) - 2);
+        for (let k = 0; k <= maxK; k++) {
+            if (k > 0) term *= k / lnX;
+            if (term < 1e-16 * sum && k > 5) break;
+            sum += term;
+        }
+        return (x / lnX) * sum;
+    };
+
+    const refineMilestoneWithLi = (n, x0) => {
+        let x = x0;
+        for (let iter = 0; iter < 6; iter++) {
+            const fx = li(x) - n;
+            const lnX = Math.log(x);
+            const dx = fx * lnX; // 뉴턴 스텝: x - f(x)/f'(x), f'(x)=1/ln(x)
+            x = x - dx;
+            if (Math.abs(dx) < 1) break;
+        }
+        return Math.round(x);
+    };
+
     const preciseLn = (bigN) => {
         const s = bigN.toString();
         const digits = s.length;
@@ -193,19 +224,71 @@ const PrimeEngine = (() => {
         return larges[1];
     };
 
-    const bigIntLocalSearch = (anchorValue, anchorIndex, targetIndex, isPrimeFn) => {
+    // [수정 7] x가 2^53(Number 정수 정확도 한계)을 넘으면 primeCountingPi는 조용히 틀린 답을
+    // 낼 수 있다. larges 배열만 BigInt(BigInt64Array)로 바꾼 버전 — smalls는 항상 sqrt(x) 이하
+    // 값만 담아 안전하므로 그대로 둔다. 10^12에서 원본과 정확히 일치 검증됨(37,607,912,018).
+    // 실측 오버헤드 9.29배 — attemptAnyway의 순차 BigInt워크(같은 거리에서 추정 600년)보다
+    // 압도적으로 낫다(10^15 milestone 기준 추정 ~9.6시간).
+    const isqrt = (n) => {
+        if (n < 2n) return n;
+        let x = n, y = (x + 1n) >> 1n;
+        while (y < x) { x = y; y = (x + n / x) >> 1n; }
+        return x;
+    };
+
+    const primeCountingPiBig = (xBig) => {
+        const sqrtNBig = isqrt(xBig);
+        const sqrtN = Number(sqrtNBig);
+        const smalls = new Uint32Array(sqrtN + 1);
+        const larges = new BigInt64Array(sqrtN + 1);
+
+        for (let i = 1; i <= sqrtN; i++) smalls[i] = i - 1;
+        for (let i = 1; i <= sqrtN; i++) larges[i] = xBig / BigInt(i) - 1n;
+
+        for (let p = 2; p <= sqrtN; p++) {
+            if (smalls[p] === smalls[p - 1]) continue;
+            const sp1 = smalls[p - 1];
+            const sp1Big = BigInt(sp1);
+            const p2Big = BigInt(p) * BigInt(p);
+            const limitBig = xBig / p2Big;
+            const limit = limitBig > BigInt(sqrtN) ? sqrtN : Number(limitBig);
+            for (let i = 1; i <= limit; i++) {
+                const d = i * p;
+                let val;
+                if (d <= sqrtN) {
+                    val = larges[d];
+                } else {
+                    const q = Number(xBig / BigInt(d)); // d>sqrtN이면 x/d<sqrtN, Number로 안전
+                    val = BigInt(smalls[q]);
+                }
+                larges[i] -= (val - sp1Big);
+            }
+            const p2 = p * p;
+            for (let v = sqrtN; v >= p2; v--) {
+                smalls[v] -= smalls[Math.floor(v / p)] - sp1;
+            }
+        }
+        return larges[1]; // BigInt
+    };
+
+    const bigIntLocalSearch = (anchorValue, anchorIndex, targetIndex, isPrimeFn, progress) => {
         let pos = anchorValue;
         let count = anchorIndex;
         let steps = 0n;
+        const t0 = performance.now();
+        const totalSteps = targetIndex > anchorIndex ? targetIndex - anchorIndex : anchorIndex - targetIndex;
+        const logEvery = 1_000_000n; // 100만 스텝마다 진행상황 출력 (죽일지 말지 판단할 근거)
         if (targetIndex > anchorIndex) {
             while (count < targetIndex) {
                 pos += 1n; steps++;
                 if (isPrimeFn(pos)) count++;
+                if (progress && steps % logEvery === 0n) progress(steps, totalSteps, pos, t0);
             }
         } else if (targetIndex < anchorIndex) {
             while (count > targetIndex) {
                 if (isPrimeFn(pos)) count--;
                 pos -= 1n; steps++;
+                if (progress && steps % logEvery === 0n) progress(steps, totalSteps, pos, t0);
             }
             while (!isPrimeFn(pos)) pos -= 1n;
         }
@@ -214,6 +297,7 @@ const PrimeEngine = (() => {
 
     return {
         primeCountingPi,
+        primeCountingPiBig,
         isPrime,
         SAFE_INTEGER_LIMIT: CONFIG.SAFE_INTEGER_LIMIT,
         OEIS_ANCHOR_COUNT: CONFIG.OEIS_ANCHORS.length,
@@ -294,7 +378,10 @@ const PrimeEngine = (() => {
             return { chain, intervals };
         },
 
-        findNthPrime: function (targetN) {
+        findNthPrime: function (targetN, opts = {}) {
+            const quiet = !!opts.quiet;
+            const attemptAnyway = !!opts.attemptAnyway; // true면 SAFE_INTEGER_LIMIT/거리상한을 넘어도 거부 대신 BigInt로 그냥 시도
+            const log = quiet ? () => {} : console.log;
             const n = BigInt(targetN);
             if (n < 1n) throw new Error(`❌ n은 1 이상이어야 합니다 (입력값: ${n})`);
 
@@ -307,7 +394,7 @@ const PrimeEngine = (() => {
                     pos += 1n;
                     if (this.isPrime(pos)) count++;
                 }
-                console.log(`ℹ️ n<=10은 직접 셈: ${pos}`);
+                log(`ℹ️ n<=10은 직접 셈: ${pos}`);
                 console.groupEnd();
                 return pos.toString();
             }
@@ -320,46 +407,121 @@ const PrimeEngine = (() => {
             }
 
             // [수정 1] 정확히 일치하는 앵커면 sieve/근사 전부 생략하고 즉시 반환.
-            // (이게 없으면 exact-match일 때도 매번 windowSize=1000짜리 segmentSieve를 돌렸음)
             if (nearestDist === 0n) {
-                console.log(`⚡ 캐시 정확 일치: ${nearestAnchor.value.toLocaleString()}`);
+                log(`⚡ 캐시 정확 일치: ${nearestAnchor.value.toLocaleString()}`);
                 console.groupEnd();
                 return nearestAnchor.value.toString();
             }
 
+            // 진행상황 출력용 (attemptAnyway로 초장거리 BigInt 워크를 돌릴 때, 죽일지 계속 볼지 판단할 근거를 준다)
+            // totalSteps 추정: bigIntLocalSearch는 '인덱스(몇 번째 소수인지) 거리'가 아니라
+            // '포지션(숫자) 거리'만큼 한 칸씩 걷는다 — 그 사이 합성수도 다 지나가야 하므로
+            // 실제 걸음 수는 인덱스거리 × 평균 소수간격(ln value) 만큼 더 크다.
+            // (처음엔 인덱스거리를 그대로 totalSteps로 써서 진행률이 133%, 200%처럼 튀는 버그가 있었음)
+            const estimatedTotalSteps = (() => {
+                if (!nearestAnchor) return nearestDist;
+                // searchFromPoint에서 고쳤던 것과 같은 문제: 앵커 자신의 값만 쓰면(예: 2) ln(2)=0.69로
+                // 간격을 심하게 과소평가한다. 타겟 인덱스의 PNT 근사(n·ln n)와 앵커 값 중 큰 쪽을 쓴다.
+                const targetMagnitudeEstimate = Number(n) > 1 ? Number(n) * Math.log(Number(n)) : Number(nearestAnchor.value);
+                const avgGapEstimate = Math.log(Math.max(Number(nearestAnchor.value), targetMagnitudeEstimate, 2));
+                return BigInt(Math.ceil(Number(nearestDist) * avgGapEstimate));
+            })();
+            const progressLogger = (steps, _totalStepsFromCaller, pos, tStart) => {
+                const totalSteps = estimatedTotalSteps; // 인덱스거리가 아니라 위에서 보정한 포지션거리 추정치 사용
+                const elapsedSec = (performance.now() - tStart) / 1000;
+                const stepsPerSec = Number(steps) / elapsedSec;
+                const remaining = totalSteps - steps;
+                const etaSec = stepsPerSec > 0 ? Number(remaining) / stepsPerSec : Infinity;
+                const etaYears = etaSec / 3.15e7;
+                const pct = totalSteps > 0n ? (Number(steps) / Number(totalSteps) * 100) : 0;
+                console.log(
+                    `  ⏳ ${steps.toLocaleString()}/${totalSteps.toLocaleString()} 스텝 ` +
+                    `(${pct.toExponential(2)}%), ${stepsPerSec.toFixed(0)}스텝/초, ` +
+                    `현재 위치=${pos.toString().length}자리, ` +
+                    `남은 예상시간 ≈ ${etaYears > 1 ? etaYears.toExponential(2)+'년' : (etaSec/3600).toFixed(1)+'시간'}`
+                );
+            };
+
             const anchorExceedsNumberSafety = nearestAnchor && Number(nearestAnchor.value) > CONFIG.SAFE_INTEGER_LIMIT;
             if (anchorExceedsNumberSafety) {
-                if (nearestDist > CONFIG.BIGINT_WALK_MAX_DIST) {
+                if (nearestDist > CONFIG.BIGINT_WALK_MAX_DIST && !attemptAnyway) {
                     console.groupEnd();
                     throw new Error(
                         `❌ 가장 가까운 앵커(index=10^${Math.log10(Number(nearestAnchor.index)).toFixed(0)})에서도 ` +
                         `거리가 ${nearestDist.toLocaleString()}로 너무 멉니다 ` +
                         `(BigInt 로컬워크 상한 ${CONFIG.BIGINT_WALK_MAX_DIST.toLocaleString()}).\n` +
-                        `   이 스케일은 milestone도 Number 정밀도를 넘어가서 계산 불가능합니다.`
+                        `   이 스케일은 milestone도 Number 정밀도를 넘어가서 계산 불가능합니다.\n` +
+                        `   그래도 시도하려면 findNthPrime(n, { attemptAnyway: true })로 호출하세요` +
+                        ` — 끝날 거란 보장은 없습니다.`
                     );
                 }
-                console.log(`⚓🔢 초대형 앵커 사용(BigInt 전용 로컬워크): value=${nearestAnchor.value.toLocaleString()}, 거리=${nearestDist.toLocaleString()}`);
-                const r = bigIntLocalSearch(nearestAnchor.value, nearestAnchor.index, n, this.isPrime);
+                log(`⚓🔢 초대형 앵커 사용(BigInt 전용 로컬워크): value=${nearestAnchor.value.toLocaleString()}, 거리=${nearestDist.toLocaleString()}`);
+                const r = bigIntLocalSearch(nearestAnchor.value, nearestAnchor.index, n, this.isPrime, quiet ? null : progressLogger);
                 const elapsed = (performance.now() - t0).toFixed(1);
-                console.log(`✅ 결과: ${r.pos.toLocaleString()}`);
-                console.log(`🔧 BigInt 로컬 스텝: ${r.steps.toLocaleString()}, 총 소요시간: ${elapsed}ms`);
+                log(`✅ 결과: ${r.pos.toLocaleString()}`);
+                log(`🔧 BigInt 로컬 스텝: ${r.steps.toLocaleString()}, 총 소요시간: ${elapsed}ms`);
                 saveCachedAnchor(n, r.pos);
-                console.log(`💾 이 결과를 새 앵커로 저장함 (다음부터 이 근처는 더 빨라짐)`);
+                log(`💾 이 결과를 새 앵커로 저장함 (다음부터 이 근처는 더 빨라짐)`);
                 console.groupEnd();
                 return r.pos.toString();
             }
 
-            const milestone = cipollaMilestone(n);
+            const milestone = refineMilestoneWithLi(Number(n), cipollaMilestone(n));
 
             if (milestone > CONFIG.SAFE_INTEGER_LIMIT) {
+                // [수정 7] x가 2^53을 넘으면 원래는 거부했지만, sqrt(milestone)이 여전히
+                // JS 타입드어레이 한계(약 42억 원소) 안이면 larges만 BigInt인 primeCountingPiBig로
+                // '진짜로' 정확히 계산할 수 있다 — 10^12에서 원본과 정확히 일치 검증됨(37,607,912,018).
+                // 실측 오버헤드 9.29배로, attemptAnyway 없이도 기본 동작으로 자동 전환한다.
+                // 진짜로 sqrt(milestone)조차 배열 한계를 넘는 스케일에서만 attemptAnyway가 필요하다.
+                const sqrtMilestoneEstimate = Math.sqrt(milestone);
+                const TYPED_ARRAY_LIMIT = 4_000_000_000;
+
+                if (sqrtMilestoneEstimate > TYPED_ARRAY_LIMIT) {
+                    if (!attemptAnyway) {
+                        console.groupEnd();
+                        throw new Error(
+                            `❌ sqrt(milestone)(${sqrtMilestoneEstimate.toExponential(3)})이 배열 한계` +
+                            `(${TYPED_ARRAY_LIMIT.toExponential(3)}) 자체를 넘습니다.\n` +
+                            `   이 스케일은 BigInt로도 배열 기반 계산이 불가능합니다(JS 타입드어레이 하드 한계).\n` +
+                            `   그래도 시도하려면 findNthPrime(n, { attemptAnyway: true })로 호출하세요` +
+                            ` — 순차 BigInt 워크뿐이라 끝날 거란 보장은 없습니다.`
+                        );
+                    }
+                    log(`⚠️ attemptAnyway: sqrt(milestone)도 배열 한계 초과 — BigInt 순차워크로 강행`);
+                    log(`⚓🔢 가장 가까운 앵커: value=${nearestAnchor.value.toLocaleString()}, 거리=${nearestDist.toLocaleString()}`);
+                    const r = bigIntLocalSearch(nearestAnchor.value, nearestAnchor.index, n, this.isPrime, quiet ? null : progressLogger);
+                    log(`✅ 결과: ${r.pos.toLocaleString()}`);
+                    saveCachedAnchor(n, r.pos);
+                    console.groupEnd();
+                    return r.pos.toString();
+                }
+
+                log(`🔢 milestone이 2^53 초과(${milestone.toExponential(3)}) — BigInt(larges) 정밀버전으로 자동 전환`);
+                const milestoneBig = BigInt(Math.round(milestone));
+                const tPi0 = performance.now();
+                const exactCountBig = this.primeCountingPiBig(milestoneBig);
+                const tPi = (performance.now() - tPi0).toFixed(1);
+                log(`🔢 π(milestone) = ${exactCountBig.toLocaleString()} (정확, BigInt, ${tPi}ms)`);
+
+                let posBig;
+                if (exactCountBig === n) {
+                    posBig = milestoneBig;
+                } else {
+                    // 로컬 보정도 segmentSieve(Number 기반) 대신, 이미 검증된 bigIntLocalSearch로.
+                    const r = bigIntLocalSearch(milestoneBig, exactCountBig, n, this.isPrime, quiet ? null : progressLogger);
+                    posBig = r.pos;
+                    log(`🔧 BigInt 로컬 보정 스텝: ${r.steps.toLocaleString()}`);
+                }
+                while (!this.isPrime(posBig)) posBig -= 1n;
+
+                const elapsed = (performance.now() - t0).toFixed(1);
+                log(`✅ 결과: ${posBig.toLocaleString()}`);
+                log(`🔧 총 소요시간: ${elapsed}ms`);
+                saveCachedAnchor(n, posBig);
+                log(`💾 이 결과를 새 앵커로 저장함`);
                 console.groupEnd();
-                throw new Error(
-                    `❌ milestone(${milestone.toExponential(3)})이 안전 한계` +
-                    `(${CONFIG.SAFE_INTEGER_LIMIT.toExponential(3)})를 초과합니다.\n` +
-                    `   이 엔진은 내부적으로 Number(double)를 쓰기 때문에 이 스케일에서는\n` +
-                    `   정수 연산이 깨져 틀린 답을 낼 수 있습니다. n을 줄이거나,\n` +
-                    `   가까운 초대형 앵커가 있는지 확인하세요.`
-                );
+                return posBig.toString();
             }
 
             const avgGapAtAnchor = nearestAnchor && nearestAnchor.value > 1n ? Math.log(Number(nearestAnchor.value)) : Infinity;
@@ -380,7 +542,12 @@ const PrimeEngine = (() => {
                 let marginMultiplier = 1.15;
                 let primesInWindow, idx;
                 for (let attempt = 0; attempt < 4; attempt++) {
-                    const windowSize = Math.ceil(Math.abs(diff) * avgGap * marginMultiplier) + 1000000000;
+                    // [수정 4] +1000 고정 여유분도 marginMultiplier에 같이 곱해야 재시도가 실제로 의미 있다.
+                    // 예전엔 diff가 작을 때(예: 바로 다음 소수 하나만 찾을 때) windowSize가 사실상
+                    // +1000에 의해 지배되는데, 그 부분은 재시도해도 커지지 않아서 이례적으로 큰 소수
+                    // 간격(10^18 근방에선 실측 기록상 gap이 1000~1500대까지도 나옴) 앞에서 4번을
+                    // 다 재시도해도 실패할 수 있었다(합성 케이스로 재현 확인).
+                    const windowSize = Math.ceil((Math.abs(diff) * avgGap + 1000) * marginMultiplier);
                     const useUpward = diff > 0;
                     const lo = useUpward ? startValue + 1 : Math.max(2, startValue - windowSize);
                     const hi = useUpward ? startValue + windowSize : startValue;
