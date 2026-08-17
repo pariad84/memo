@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>그룹 관리 (데모)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; max-width: 560px; margin: 60px auto; padding: 0 20px; color: #111; }
+  h1 { font-size: 20px; }
+  h2 { font-size: 15px; margin-top: 32px; }
+  p.hint { color: #666; font-size: 13px; line-height: 1.5; }
+  label { display: block; font-size: 13px; font-weight: 600; margin: 14px 0 4px; }
+  input { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+  button { margin-top: 10px; padding: 8px 14px; border: none; background: #2a78d6; color: #fff; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  button:hover { background: #1c5cab; }
+  .card { border: 1px solid #eee; border-radius: 10px; padding: 16px; margin-top: 14px; background: #fafaf9; }
+  .link-box { display: flex; gap: 6px; margin-top: 8px; }
+  .link-box input { font-size: 12px; }
+  .link-box button { margin-top: 0; flex-shrink: 0; }
+  ul { padding-left: 18px; font-size: 13px; }
+  #err { color: #c0392b; font-size: 13px; margin-top: 8px; }
+  #hidden-until-login { display: none; }
+</style>
+</head>
+<body>
+  <h1>그룹 관리 (데모)</h1>
+  <p class="hint">아래 <code>YOUR_GOOGLE_CLIENT_ID</code>를 실제 클라이언트 ID로 바꾸고, 이 서버를 그 오리진으로 서빙해서 열 것.</p>
+
+  <div id="g_id_onload" data-client_id="YOUR_GOOGLE_CLIENT_ID" data-callback="handleCredentialResponse"></div>
+  <div class="g_id_signin" data-type="standard"></div>
+
+  <div id="hidden-until-login">
+    <h2>1. 그룹 만들기</h2>
+    <label>그룹 이름</label>
+    <input id="groupName" placeholder="예: 우리 동아리" />
+    <button id="createGroupBtn">그룹 만들기</button>
+
+    <div class="card" id="groupCard" style="display:none;">
+      <div id="groupInfo"></div>
+
+      <h2>2. 초대하기</h2>
+      <label>초대할 이메일 (비워두면 링크를 아는 누구나 참여 가능)</label>
+      <input id="inviteEmail" placeholder="friend@example.com" />
+      <button id="inviteBtn">초대 링크 만들기</button>
+      <div class="link-box" id="linkBox" style="display:none;">
+        <input id="inviteLink" readonly />
+      </div>
+
+      <h2>멤버</h2>
+      <ul id="memberList"></ul>
+    </div>
+  </div>
+
+  <div id="err"></div>
+
+  <script>
+    let idToken = null;
+    let currentGroupId = null;
+
+    function handleCredentialResponse(response) {
+      idToken = response.credential;
+      document.getElementById('hidden-until-login').style.display = 'block';
+    }
+
+    async function api(path, body) {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ idToken, ...body }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || data.error);
+      return data;
+    }
+
+    function showError(e) {
+      document.getElementById('err').textContent = e.message;
+    }
+
+    async function refreshMembers() {
+      const res = await fetch(`/groups/${currentGroupId}/members`);
+      const members = await res.json();
+      const list = document.getElementById('memberList');
+      list.innerHTML = '';
+      for (const m of members) {
+        const li = document.createElement('li');
+        li.textContent = `${m.name} (${m.email}) — ${m.role}`;
+        list.appendChild(li);
+      }
+    }
+
+    document.getElementById('createGroupBtn').addEventListener('click', async () => {
+      try {
+        const name = document.getElementById('groupName').value.trim();
+        if (!name) return;
+        const group = await api('/groups', { name });
+        currentGroupId = group.id;
+        document.getElementById('groupCard').style.display = 'block';
+        document.getElementById('groupInfo').textContent = `그룹 "${group.name}" 생성됨 (id: ${group.id})`;
+        await refreshMembers();
+      } catch (e) { showError(e); }
+    });
+
+    document.getElementById('inviteBtn').addEventListener('click', async () => {
+      try {
+        const email = document.getElementById('inviteEmail').value.trim();
+        const result = await fetch(`/groups/${currentGroupId}/invites`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ idToken, email: email || null }),
+        }).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.message || d.error); return d; });
+        document.getElementById('linkBox').style.display = 'flex';
+        document.getElementById('inviteLink').value = result.link;
+      } catch (e) { showError(e); }
+    });
+  </script>
+</body>
+</html>
