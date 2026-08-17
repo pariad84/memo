@@ -1,0 +1,469 @@
+{
+  "generatedAt": "2026-08-17T00:20:34.119Z",
+  "bands": {
+    "10^6": [
+      {
+        "order": 0,
+        "target": "1019911",
+        "elapsedMs": 9.668937,
+        "localAnchorsBefore": 0
+      },
+      {
+        "order": 1,
+        "target": "1195806",
+        "elapsedMs": 2.778877999999999,
+        "localAnchorsBefore": 6
+      },
+      {
+        "order": 2,
+        "target": "1124771",
+        "elapsedMs": 2.305896000000004,
+        "localAnchorsBefore": 12
+      },
+      {
+        "order": 3,
+        "target": "1094609",
+        "elapsedMs": 2.456831000000001,
+        "localAnchorsBefore": 18
+      },
+      {
+        "order": 4,
+        "target": "1186036",
+        "elapsedMs": 6.964143000000007,
+        "localAnchorsBefore": 24
+      },
+      {
+        "order": 5,
+        "target": "1139970",
+        "elapsedMs": 2.0023840000000064,
+        "localAnchorsBefore": 29
+      },
+      {
+        "order": 6,
+        "target": "1066911",
+        "elapsedMs": 1.9999869999999902,
+        "localAnchorsBefore": 35
+      },
+      {
+        "order": 7,
+        "target": "1084637",
+        "elapsedMs": 2.241184000000004,
+        "localAnchorsBefore": 41
+      },
+      {
+        "order": 8,
+        "target": "1003947",
+        "elapsedMs": 1.8117129999999975,
+        "localAnchorsBefore": 46
+      },
+      {
+        "order": 9,
+        "target": "1108402",
+        "elapsedMs": 2.0031610000000057,
+        "localAnchorsBefore": 52
+      },
+      {
+        "order": 10,
+        "target": "1156165",
+        "elapsedMs": 2.249586999999991,
+        "localAnchorsBefore": 58
+      },
+      {
+        "order": 11,
+        "target": "1026940",
+        "elapsedMs": 2.1077279999999945,
+        "localAnchorsBefore": 64
+      },
+      {
+        "order": 12,
+        "target": "1034871",
+        "elapsedMs": 2.170901999999998,
+        "localAnchorsBefore": 70
+      },
+      {
+        "order": 13,
+        "target": "1167756",
+        "elapsedMs": 2.5997310000000056,
+        "localAnchorsBefore": 76
+      },
+      {
+        "order": 14,
+        "target": "1057032",
+        "elapsedMs": 2.145302000000001,
+        "localAnchorsBefore": 82
+      },
+      {
+        "order": 15,
+        "target": "1175390",
+        "elapsedMs": 1.8166429999999991,
+        "localAnchorsBefore": 87
+      },
+      {
+        "order": 16,
+        "target": "1114163",
+        "elapsedMs": 1.8801240000000092,
+        "localAnchorsBefore": 93
+      },
+      {
+        "order": 17,
+        "target": "1041659",
+        "elapsedMs": 2.2488270000000057,
+        "localAnchorsBefore": 99
+      },
+      {
+        "order": 18,
+        "target": "1079222",
+        "elapsedMs": 1.4221150000000051,
+        "localAnchorsBefore": 105
+      },
+      {
+        "order": 19,
+        "target": "1146162",
+        "elapsedMs": 1.8154439999999994,
+        "localAnchorsBefore": 110
+      }
+    ],
+    "10^9": [
+      {
+        "order": 0,
+        "target": "1000912702",
+        "elapsedMs": 111.083969,
+        "localAnchorsBefore": 0
+      },
+      {
+        "order": 1,
+        "target": "1002666801",
+        "elapsedMs": 111.767886,
+        "localAnchorsBefore": 6
+      },
+      {
+        "order": 2,
+        "target": "1004622540",
+        "elapsedMs": 110.33049799999998,
+        "localAnchorsBefore": 12
+      },
+      {
+        "order": 3,
+        "target": "1002015353",
+        "elapsedMs": 108.34952699999997,
+        "localAnchorsBefore": 18
+      },
+      {
+        "order": 4,
+        "target": "1003541308",
+        "elapsedMs": 108.45927500000005,
+        "localAnchorsBefore": 24
+      },
+      {
+        "order": 5,
+        "target": "1003308318",
+        "elapsedMs": 62.92560400000002,
+        "localAnchorsBefore": 29
+      },
+      {
+        "order": 6,
+        "target": "1001507088",
+        "elapsedMs": 109.98350700000003,
+        "localAnchorsBefore": 34
+      },
+      {
+        "order": 7,
+        "target": "1001262624",
+        "elapsedMs": 63.56213300000002,
+        "localAnchorsBefore": 40
+      },
+      {
+        "order": 8,
+        "target": "1002207397",
+        "elapsedMs": 49.72760999999991,
+        "localAnchorsBefore": 45
+      },
+      {
+        "order": 9,
+        "target": "1004864539",
+        "elapsedMs": 62.058725000000095,
+        "localAnchorsBefore": 51
+      },
+      {
+        "order": 10,
+        "target": "1000102223",
+        "elapsedMs": 107.84749299999999,
+        "localAnchorsBefore": 57
+      },
+      {
+        "order": 11,
+        "target": "1000500843",
+        "elapsedMs": 107.384319,
+        "localAnchorsBefore": 63
+      },
+      {
+        "order": 12,
+        "target": "1004272805",
+        "elapsedMs": 108.31090000000017,
+        "localAnchorsBefore": 69
+      },
+      {
+        "order": 13,
+        "target": "1000266106",
+        "elapsedMs": 47.49300799999992,
+        "localAnchorsBefore": 75
+      },
+      {
+        "order": 14,
+        "target": "1003882370",
+        "elapsedMs": 108.25628000000006,
+        "localAnchorsBefore": 81
+      },
+      {
+        "order": 15,
+        "target": "1001086715",
+        "elapsedMs": 35.097590999999966,
+        "localAnchorsBefore": 87
+      },
+      {
+        "order": 16,
+        "target": "1003031769",
+        "elapsedMs": 63.39468899999997,
+        "localAnchorsBefore": 92
+      },
+      {
+        "order": 17,
+        "target": "1000686318",
+        "elapsedMs": 47.74535900000001,
+        "localAnchorsBefore": 97
+      },
+      {
+        "order": 18,
+        "target": "1001896750",
+        "elapsedMs": 29.803220999999894,
+        "localAnchorsBefore": 103
+      },
+      {
+        "order": 19,
+        "target": "1002510439",
+        "elapsedMs": 39.05703900000003,
+        "localAnchorsBefore": 108
+      },
+      {
+        "order": 20,
+        "target": "1001776278",
+        "elapsedMs": 26.756353999999874,
+        "localAnchorsBefore": 113
+      },
+      {
+        "order": 21,
+        "target": "1002916366",
+        "elapsedMs": 25.708492999999862,
+        "localAnchorsBefore": 118
+      },
+      {
+        "order": 22,
+        "target": "1004425311",
+        "elapsedMs": 38.69562699999983,
+        "localAnchorsBefore": 123
+      },
+      {
+        "order": 23,
+        "target": "1003747575",
+        "elapsedMs": 34.04822899999999,
+        "localAnchorsBefore": 129
+      },
+      {
+        "order": 24,
+        "target": "1004078726",
+        "elapsedMs": 48.82967699999995,
+        "localAnchorsBefore": 134
+      }
+    ],
+    "10^10": [
+      {
+        "order": 0,
+        "target": "10013139953",
+        "elapsedMs": 595.863,
+        "localAnchorsBefore": 0
+      },
+      {
+        "order": 1,
+        "target": "10015268659",
+        "elapsedMs": 597.6493929999997,
+        "localAnchorsBefore": 6
+      },
+      {
+        "order": 2,
+        "target": "10001204758",
+        "elapsedMs": 611.694187,
+        "localAnchorsBefore": 12
+      },
+      {
+        "order": 3,
+        "target": "10005232449",
+        "elapsedMs": 595.4580490000003,
+        "localAnchorsBefore": 18
+      },
+      {
+        "order": 4,
+        "target": "10003872369",
+        "elapsedMs": 593.4668240000001,
+        "localAnchorsBefore": 24
+      },
+      {
+        "order": 5,
+        "target": "10016506738",
+        "elapsedMs": 593.7086910000007,
+        "localAnchorsBefore": 30
+      },
+      {
+        "order": 6,
+        "target": "10002493422",
+        "elapsedMs": 597.3069020000003,
+        "localAnchorsBefore": 36
+      },
+      {
+        "order": 7,
+        "target": "10004950508",
+        "elapsedMs": 78.65225299999929,
+        "localAnchorsBefore": 42
+      },
+      {
+        "order": 8,
+        "target": "10014443257",
+        "elapsedMs": 307.1609360000002,
+        "localAnchorsBefore": 47
+      },
+      {
+        "order": 9,
+        "target": "10009068169",
+        "elapsedMs": 593.7716399999999,
+        "localAnchorsBefore": 52
+      },
+      {
+        "order": 10,
+        "target": "10012668393",
+        "elapsedMs": 146.13345600000048,
+        "localAnchorsBefore": 58
+      },
+      {
+        "order": 11,
+        "target": "10010797838",
+        "elapsedMs": 592.546128,
+        "localAnchorsBefore": 63
+      },
+      {
+        "order": 12,
+        "target": "10006756703",
+        "elapsedMs": 606.7318620000005,
+        "localAnchorsBefore": 69
+      },
+      {
+        "order": 13,
+        "target": "10011586233",
+        "elapsedMs": 283.6337110000004,
+        "localAnchorsBefore": 75
+      },
+      {
+        "order": 14,
+        "target": "10017071777",
+        "elapsedMs": 202.92264500000056,
+        "localAnchorsBefore": 81
+      },
+      {
+        "order": 15,
+        "target": "10019094967",
+        "elapsedMs": 597.6678530000008,
+        "localAnchorsBefore": 87
+      },
+      {
+        "order": 16,
+        "target": "10008552727",
+        "elapsedMs": 174.68423900000016,
+        "localAnchorsBefore": 93
+      },
+      {
+        "order": 17,
+        "target": "10007731142",
+        "elapsedMs": 276.79874500000005,
+        "localAnchorsBefore": 98
+      },
+      {
+        "order": 18,
+        "target": "10018325409",
+        "elapsedMs": 297.742737999999,
+        "localAnchorsBefore": 103
+      },
+      {
+        "order": 19,
+        "target": "10000743030",
+        "elapsedMs": 141.44694799999888,
+        "localAnchorsBefore": 108
+      }
+    ],
+    "10^12": [
+      {
+        "order": 0,
+        "target": "1000013007358",
+        "elapsedMs": 18691.827817,
+        "localAnchorsBefore": 0
+      },
+      {
+        "order": 1,
+        "target": "1000043236620",
+        "elapsedMs": 18459.415616000002,
+        "localAnchorsBefore": 6
+      },
+      {
+        "order": 2,
+        "target": "1000026805450",
+        "elapsedMs": 18390.045911,
+        "localAnchorsBefore": 12
+      },
+      {
+        "order": 3,
+        "target": "1000005257274",
+        "elapsedMs": 9607.147608999992,
+        "localAnchorsBefore": 18
+      },
+      {
+        "order": 4,
+        "target": "1000037623658",
+        "elapsedMs": 5044.596744999988,
+        "localAnchorsBefore": 23
+      },
+      {
+        "order": 5,
+        "target": "1000024186333",
+        "elapsedMs": 2553.1595319999906,
+        "localAnchorsBefore": 28
+      }
+    ]
+  },
+  "summaries": [
+    {
+      "label": "10^6",
+      "queries": 20,
+      "avgFirstHalfMs": 3.4233114000000016,
+      "avgSecondHalfMs": 2.045640300000001,
+      "speedup": 1.6734669335562073
+    },
+    {
+      "label": "10^9",
+      "queries": 25,
+      "avgFirstHalfMs": 92.7900455,
+      "avgSecondHalfMs": 45.40713058333328,
+      "speedup": 2.0435126445549647
+    },
+    {
+      "label": "10^10",
+      "queries": 20,
+      "avgFirstHalfMs": 516.4731875,
+      "avgSecondHalfMs": 332.0308325000001,
+      "speedup": 1.5554976735481332
+    },
+    {
+      "label": "10^12",
+      "queries": 6,
+      "avgFirstHalfMs": 18513.763114666668,
+      "avgSecondHalfMs": 5734.967961999991,
+      "speedup": 3.2282243313893333
+    }
+  ]
+}
