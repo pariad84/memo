@@ -64,8 +64,8 @@ const errorStatus = (err) => {
 };
 
 const STATIC_DIR = __dirname;
-const serveStatic = (req, res) => {
-    const filePath = path.join(STATIC_DIR, req.url === '/' ? 'dashboard.html' : req.url);
+const serveStatic = (pathname, res) => {
+    const filePath = path.join(STATIC_DIR, pathname === '/' ? 'dashboard.html' : pathname);
     if (!filePath.startsWith(STATIC_DIR)) return sendJson(res, 403, { error: 'FORBIDDEN' });
     fs.readFile(filePath, (err, data) => {
         if (err) return sendJson(res, 404, { error: 'NOT_FOUND' });
@@ -79,6 +79,10 @@ const serveStatic = (req, res) => {
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, BASE_URL);
     try {
+        if (req.method === 'GET' && url.pathname === '/config.json') {
+            return sendJson(res, 200, { googleClientId: CLIENT_ID });
+        }
+
         if (req.method === 'POST' && url.pathname === '/groups') {
             const { user, body } = await requireGoogleUser(req);
             const group = store.createGroup({ name: body.name, ownerSub: user.sub, ownerEmail: user.email, ownerName: user.name });
@@ -113,7 +117,7 @@ const server = http.createServer(async (req, res) => {
             return sendJson(res, 200, store.listMembers(membersMatch[1]));
         }
 
-        if (req.method === 'GET') return serveStatic(req, res);
+        if (req.method === 'GET') return serveStatic(url.pathname, res);
         return sendJson(res, 404, { error: 'NOT_FOUND' });
     } catch (err) {
         return sendJson(res, errorStatus(err), { error: err.code || 'UNKNOWN_ERROR', message: err.message });

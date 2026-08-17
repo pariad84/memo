@@ -44,21 +44,15 @@
 
       card.innerHTML = '';
       const p = document.createElement('p');
-      p.innerHTML = '';
       const strong = document.createElement('strong');
       strong.textContent = invite.groupName;
       p.append(strong, '에 초대되었습니다. Google 계정으로 로그인하면 참여됩니다.');
-      const onload = document.createElement('div');
-      onload.id = 'g_id_onload';
-      onload.dataset.client_id = 'YOUR_GOOGLE_CLIENT_ID';
-      onload.dataset.callback = 'handleCredentialResponse';
       const btn = document.createElement('div');
-      btn.className = 'g_id_signin';
-      btn.dataset.type = 'standard';
-      card.append(p, onload, btn);
+      card.append(p, btn);
       try {
+        const config = await fetch('/config.json').then((r) => r.json());
         await waitForGoogleIdentity();
-        google.accounts.id.initialize({ client_id: 'YOUR_GOOGLE_CLIENT_ID', callback: handleCredentialResponse });
+        google.accounts.id.initialize({ client_id: config.googleClientId, callback: handleCredentialResponse });
         google.accounts.id.renderButton(btn, { type: 'standard' });
       } catch (e) {
         renderMessage(e.message, 'error');
