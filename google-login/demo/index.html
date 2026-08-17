@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>Google 로그인 데모</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; max-width: 640px; margin: 60px auto; padding: 0 20px; color: #111; }
+  h1 { font-size: 20px; }
+  p.hint { color: #666; font-size: 14px; line-height: 1.6; }
+  code { background: #f3f2ef; padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+  #status { margin: 20px 0; font-size: 14px; }
+  pre { background: #f3f2ef; padding: 14px; border-radius: 8px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; }
+  .profile { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+  .profile img { width: 48px; height: 48px; border-radius: 50%; }
+</style>
+</head>
+<body>
+  <h1>Google 로그인 데모 (프론트엔드 전용)</h1>
+  <p class="hint">
+    아래 <code>YOUR_GOOGLE_CLIENT_ID</code>를 실제 OAuth 클라이언트 ID로 바꾸고, 이 파일을
+    <code>http://localhost</code>(또는 콘솔에 등록한 도메인)로 서빙해서 열면 버튼이 나타난다.
+    로그인하면 여기 있는 자바스크립트는 받은 ID 토큰을 <b>검증 없이</b> 그대로 화면에 보여주기만 한다 —
+    실제로 신뢰하려면 이 토큰을 서버로 보내서 <code>../verify.js</code>의
+    <code>verifyGoogleIdToken()</code>으로 서명을 검증해야 한다 (아래 안내 참고).
+  </p>
+
+  <div id="g_id_onload"
+       data-client_id="YOUR_GOOGLE_CLIENT_ID"
+       data-callback="handleCredentialResponse">
+  </div>
+  <div class="g_id_signin" data-type="standard"></div>
+
+  <div id="status"></div>
+
+  <script>
+    function base64urlDecode(str) {
+      str = str.replace(/-/g, '+').replace(/_/g, '/');
+      while (str.length % 4) str += '=';
+      return decodeURIComponent(atob(str).split('').map(c =>
+        '%' + c.charCodeAt(0).toString(16).padStart(2, '0')
+      ).join(''));
+    }
+
+    function handleCredentialResponse(response) {
+      const idToken = response.credential;
+      const payload = JSON.parse(base64urlDecode(idToken.split('.')[1]));
+
+      const statusEl = document.getElementById('status');
+      statusEl.innerHTML = '';
+
+      const profile = document.createElement('div');
+      profile.className = 'profile';
+      const img = document.createElement('img');
+      img.src = payload.picture;
+      img.alt = '';
+      const name = document.createElement('div');
+      const strong = document.createElement('strong');
+      strong.textContent = payload.name;
+      const email = document.createElement('div');
+      email.textContent = payload.email;
+      email.style.color = '#666';
+      email.style.fontSize = '13px';
+      name.append(strong, document.createElement('br'), email);
+      profile.append(img, name);
+
+      const note = document.createElement('p');
+      note.className = 'hint';
+      note.textContent = '아래는 클라이언트에서 서명 검증 없이 디코딩만 한 것 — 진짜 신뢰하려면 idToken을 서버로 보내서 검증해야 함.';
+
+      const pre = document.createElement('pre');
+      pre.textContent = 'idToken (서버로 보낼 값):\n' + idToken + '\n\n디코딩된 payload (참고용, 미검증):\n' + JSON.stringify(payload, null, 2);
+
+      statusEl.append(profile, note, pre);
+      console.log('ID token (검증은 서버에서):', idToken);
+    }
+  </script>
+</body>
+</html>
