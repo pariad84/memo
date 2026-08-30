@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anchor Cache Growth</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --page:           #f9f9f7;
+    --surface-1:      #fcfcfb;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --series-1:       #2a78d6;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good:           #006300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --page:           #0d0d0d;
+      --surface-1:      #1a1a19;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --series-1:       #3987e5;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good:           #0ca30c;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --page:           #0d0d0d;
+    --surface-1:      #1a1a19;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --series-1:       #3987e5;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --good:           #0ca30c;
+  }
+
+  * { box-sizing: border-box; }
+  .viz-root {
+    background: var(--page);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 28px 20px 60px;
+    max-width: 980px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 22px; font-weight: 650; margin: 0 0 6px; }
+  .sub { color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin: 0 0 28px; max-width: 640px; }
+  .sub code { background: var(--surface-1); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12.5px; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
+  .stat {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .stat .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+  .stat .value { font-size: 22px; font-weight: 650; }
+  .stat .value .unit { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+  .stat .delta { font-size: 12.5px; color: var(--good); margin-top: 4px; font-weight: 600; }
+
+  h2 { font-size: 15px; font-weight: 650; margin: 0 0 4px; }
+  .section-sub { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 14px; }
+  section { margin-bottom: 34px; }
+
+  .facet-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 640px) { .facet-grid { grid-template-columns: 1fr; } }
+  .facet {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px 10px; position: relative;
+  }
+  .facet .facet-title { font-size: 13px; font-weight: 650; }
+  .facet .facet-meta { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; margin-bottom: 6px; }
+  .facet svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .axis-label { font-size: 9.5px; fill: var(--text-muted); }
+  .grid-line { stroke: var(--gridline); stroke-width: 1; }
+  .baseline { stroke: var(--baseline); stroke-width: 1; }
+  .data-line { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .dot { fill: var(--series-1); stroke: var(--surface-1); stroke-width: 2; }
+  .end-label { font-size: 10.5px; font-weight: 650; fill: var(--text-primary); }
+  .hit { fill: transparent; }
+  .crosshair { stroke: var(--baseline); stroke-width: 1; pointer-events: none; opacity: 0; }
+
+  .tooltip {
+    position: absolute; pointer-events: none; opacity: 0; transition: opacity .08s;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+    padding: 7px 10px; font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.16);
+    white-space: nowrap; z-index: 5;
+  }
+  .tooltip .t-val { font-weight: 700; font-size: 13px; }
+  .tooltip .t-row { color: var(--text-secondary); margin-top: 2px; }
+  .tooltip .t-row b { color: var(--text-primary); font-weight: 600; }
+
+  .bar-card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px 6px;
+  }
+  .bar-svg { width: 100%; height: auto; display: block; overflow: visible; }
+  .bar-fill { fill: var(--series-1); }
+  .bar-label { font-size: 12px; fill: var(--text-primary); font-weight: 650; }
+  .bar-cat { font-size: 11.5px; fill: var(--text-secondary); }
+
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--text-secondary); margin-top: 10px; }
+  .legend .key { display: inline-flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 14px; height: 2px; background: var(--series-1); display: inline-block; border-radius: 1px; }
+
+  .toggle-btn {
+    font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--text-primary);
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 7px;
+    padding: 7px 12px; cursor: pointer;
+  }
+  .toggle-btn:hover { background: var(--gridline); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 14px; }
+  table th, table td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; }
+  table th:first-child, table td:first-child { text-align: left; }
+  table th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.02em; }
+  table td { color: var(--text-secondary); }
+  table td.num-strong { color: var(--text-primary); font-weight: 600; }
+  .table-wrap { max-height: 360px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; margin-top: 10px; }
+  .table-wrap table { margin-top: 0; }
+  .table-wrap thead th { position: sticky; top: 0; background: var(--surface-1); }
+
+  footer { font-size: 11.5px; color: var(--text-muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="viz-root">
+  <h1>앵커 캐시 성장 벤치마크</h1>
+  <p class="sub">
+    <code>primes.js</code>의 <code>findNthPrime()</code>은 답을 구할 때마다 결과를 <code>anchor_cache.json</code>에 저장해서,
+    다음에 근처를 물어볼 땐 그 저장값(앵커)에서부터 출발한다. 10<sup>6</sup>~10<sup>12</sup> 사이 네 구간에서 각각
+    무작위 인덱스를 반복 질의해, 앵커가 쌓일수록 응답 시간이 실제로 줄어드는지 재봤다.
+  </p>
+
+  <div class="stats" id="statTiles"></div>
+
+  <section>
+    <h2>구간별 응답 시간 추이</h2>
+    <p class="section-sub">가로축: 이 구간 안에서 몇 번째로 질의했는지 · 세로축: 응답 시간 (구간마다 규모가 달라 축을 따로 둠)</p>
+    <div class="facet-grid" id="facetGrid"></div>
+  </section>
+
+  <section>
+    <h2>전반부 → 후반부 평균 가속 배율</h2>
+    <p class="section-sub">각 구간의 앞쪽 절반 질의 평균 시간 대비 뒤쪽 절반 질의 평균 시간</p>
+    <div class="bar-card">
+      <svg class="bar-svg" id="barChart" viewBox="0 0 860 220" preserveAspectRatio="xMidYMid meet"></svg>
+    </div>
+  </section>
+
+  <section>
+    <div style="display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <h2 style="margin-bottom:2px;">원본 데이터</h2>
+        <p class="section-sub" style="margin-bottom:0;">질의 71건 전체 로그</p>
+      </div>
+      <button class="toggle-btn" id="tableToggle">표로 보기</button>
+    </div>
+    <div class="table-wrap" id="tableWrap" style="display:none;"></div>
+  </section>
+
+  <footer>node bench_anchor_growth.js --fresh 실행 결과 · anchor_cache.json 401개 앵커 누적</footer>
+
+  <div class="tooltip" id="tooltip"></div>
+</div>
+
+<script>
+(function () {
+  const DATA = {"10^6":[{"order":0,"target":"1019911","elapsedMs":9.668937,"localAnchorsBefore":0},{"order":1,"target":"1195806","elapsedMs":2.778877999999999,"localAnchorsBefore":6},{"order":2,"target":"1124771","elapsedMs":2.305896000000004,"localAnchorsBefore":12},{"order":3,"target":"1094609","elapsedMs":2.456831000000001,"localAnchorsBefore":18},{"order":4,"target":"1186036","elapsedMs":6.964143000000007,"localAnchorsBefore":24},{"order":5,"target":"1139970","elapsedMs":2.0023840000000064,"localAnchorsBefore":29},{"order":6,"target":"1066911","elapsedMs":1.9999869999999902,"localAnchorsBefore":35},{"order":7,"target":"1084637","elapsedMs":2.241184000000004,"localAnchorsBefore":41},{"order":8,"target":"1003947","elapsedMs":1.8117129999999975,"localAnchorsBefore":46},{"order":9,"target":"1108402","elapsedMs":2.0031610000000057,"localAnchorsBefore":52},{"order":10,"target":"1156165","elapsedMs":2.249586999999991,"localAnchorsBefore":58},{"order":11,"target":"1026940","elapsedMs":2.1077279999999945,"localAnchorsBefore":64},{"order":12,"target":"1034871","elapsedMs":2.170901999999998,"localAnchorsBefore":70},{"order":13,"target":"1167756","elapsedMs":2.5997310000000056,"localAnchorsBefore":76},{"order":14,"target":"1057032","elapsedMs":2.145302000000001,"localAnchorsBefore":82},{"order":15,"target":"1175390","elapsedMs":1.8166429999999991,"localAnchorsBefore":87},{"order":16,"target":"1114163","elapsedMs":1.8801240000000092,"localAnchorsBefore":93},{"order":17,"target":"1041659","elapsedMs":2.2488270000000057,"localAnchorsBefore":99},{"order":18,"target":"1079222","elapsedMs":1.4221150000000051,"localAnchorsBefore":105},{"order":19,"target":"1146162","elapsedMs":1.8154439999999994,"localAnchorsBefore":110}],"10^9":[{"order":0,"target":"1000912702","elapsedMs":111.083969,"localAnchorsBefore":0},{"order":1,"target":"1002666801","elapsedMs":111.767886,"localAnchorsBefore":6},{"order":2,"target":"1004622540","elapsedMs":110.33049799999998,"localAnchorsBefore":12},{"order":3,"target":"1002015353","elapsedMs":108.34952699999997,"localAnchorsBefore":18},{"order":4,"target":"1003541308","elapsedMs":108.45927500000005,"localAnchorsBefore":24},{"order":5,"target":"1003308318","elapsedMs":62.92560400000002,"localAnchorsBefore":29},{"order":6,"target":"1001507088","elapsedMs":109.98350700000003,"localAnchorsBefore":34},{"order":7,"target":"1001262624","elapsedMs":63.56213300000002,"localAnchorsBefore":40},{"order":8,"target":"1002207397","elapsedMs":49.72760999999991,"localAnchorsBefore":45},{"order":9,"target":"1004864539","elapsedMs":62.058725000000095,"localAnchorsBefore":51},{"order":10,"target":"1000102223","elapsedMs":107.84749299999999,"localAnchorsBefore":57},{"order":11,"target":"1000500843","elapsedMs":107.384319,"localAnchorsBefore":63},{"order":12,"target":"1004272805","elapsedMs":108.31090000000017,"localAnchorsBefore":69},{"order":13,"target":"1000266106","elapsedMs":47.49300799999992,"localAnchorsBefore":75},{"order":14,"target":"1003882370","elapsedMs":108.25628000000006,"localAnchorsBefore":81},{"order":15,"target":"1001086715","elapsedMs":35.097590999999966,"localAnchorsBefore":87},{"order":16,"target":"1003031769","elapsedMs":63.39468899999997,"localAnchorsBefore":92},{"order":17,"target":"1000686318","elapsedMs":47.74535900000001,"localAnchorsBefore":97},{"order":18,"target":"1001896750","elapsedMs":29.803220999999894,"localAnchorsBefore":103},{"order":19,"target":"1002510439","elapsedMs":39.05703900000003,"localAnchorsBefore":108},{"order":20,"target":"1001776278","elapsedMs":26.756353999999874,"localAnchorsBefore":113},{"order":21,"target":"1002916366","elapsedMs":25.708492999999862,"localAnchorsBefore":118},{"order":22,"target":"1004425311","elapsedMs":38.69562699999983,"localAnchorsBefore":123},{"order":23,"target":"1003747575","elapsedMs":34.04822899999999,"localAnchorsBefore":129},{"order":24,"target":"1004078726","elapsedMs":48.82967699999995,"localAnchorsBefore":134}],"10^10":[{"order":0,"target":"10013139953","elapsedMs":595.863,"localAnchorsBefore":0},{"order":1,"target":"10015268659","elapsedMs":597.6493929999997,"localAnchorsBefore":6},{"order":2,"target":"10001204758","elapsedMs":611.694187,"localAnchorsBefore":12},{"order":3,"target":"10005232449","elapsedMs":595.4580490000003,"localAnchorsBefore":18},{"order":4,"target":"10003872369","elapsedMs":593.4668240000001,"localAnchorsBefore":24},{"order":5,"target":"10016506738","elapsedMs":593.7086910000007,"localAnchorsBefore":30},{"order":6,"target":"10002493422","elapsedMs":597.3069020000003,"localAnchorsBefore":36},{"order":7,"target":"10004950508","elapsedMs":78.65225299999929,"localAnchorsBefore":42},{"order":8,"target":"10014443257","elapsedMs":307.1609360000002,"localAnchorsBefore":47},{"order":9,"target":"10009068169","elapsedMs":593.7716399999999,"localAnchorsBefore":52},{"order":10,"target":"10012668393","elapsedMs":146.13345600000048,"localAnchorsBefore":58},{"order":11,"target":"10010797838","elapsedMs":592.546128,"localAnchorsBefore":63},{"order":12,"target":"10006756703","elapsedMs":606.7318620000005,"localAnchorsBefore":69},{"order":13,"target":"10011586233","elapsedMs":283.6337110000004,"localAnchorsBefore":75},{"order":14,"target":"10017071777","elapsedMs":202.92264500000056,"localAnchorsBefore":81},{"order":15,"target":"10019094967","elapsedMs":597.6678530000008,"localAnchorsBefore":87},{"order":16,"target":"10008552727","elapsedMs":174.68423900000016,"localAnchorsBefore":93},{"order":17,"target":"10007731142","elapsedMs":276.79874500000005,"localAnchorsBefore":98},{"order":18,"target":"10018325409","elapsedMs":297.742737999999,"localAnchorsBefore":103},{"order":19,"target":"10000743030","elapsedMs":141.44694799999888,"localAnchorsBefore":108}],"10^12":[{"order":0,"target":"1000013007358","elapsedMs":18691.827817,"localAnchorsBefore":0},{"order":1,"target":"1000043236620","elapsedMs":18459.415616000002,"localAnchorsBefore":6},{"order":2,"target":"1000026805450","elapsedMs":18390.045911,"localAnchorsBefore":12},{"order":3,"target":"1000005257274","elapsedMs":9607.147608999992,"localAnchorsBefore":18},{"order":4,"target":"1000037623658","elapsedMs":5044.596744999988,"localAnchorsBefore":23},{"order":5,"target":"1000024186333","elapsedMs":2553.1595319999906,"localAnchorsBefore":28}]};
+  const SUMMARIES = [{"label":"10^6","queries":20,"avgFirstHalfMs":3.4233114000000016,"avgSecondHalfMs":2.045640300000001,"speedup":1.6734669335562073},{"label":"10^9","queries":25,"avgFirstHalfMs":92.7900455,"avgSecondHalfMs":45.40713058333328,"speedup":2.0435126445549647},{"label":"10^10","queries":20,"avgFirstHalfMs":516.4731875,"avgSecondHalfMs":332.0308325000001,"speedup":1.5554976735481332},{"label":"10^12","queries":6,"avgFirstHalfMs":18513.763114666668,"avgSecondHalfMs":5734.967961999991,"speedup":3.2282243313893333}];
+
+  const root = document.querySelector('.viz-root');
+  const tooltip = document.getElementById('tooltip');
+
+  const fmtMs = (ms) => ms < 1000 ? ms.toFixed(1) + 'ms' : (ms / 1000).toFixed(2) + 's';
+  const fmtInt = (n) => Number(n).toLocaleString('en-US');
+
+  // ---------- stat tiles ----------
+  const totalQueries = Object.values(DATA).reduce((s, arr) => s + arr.length, 0);
+  const dramatic = SUMMARIES.reduce((best, s) => s.speedup > best.speedup ? s : best, SUMMARIES[0]);
+  const dramaticBand = DATA[dramatic.label];
+  const dFirst = dramaticBand[0], dLast = dramaticBand[dramaticBand.length - 1];
+
+  const statTiles = [
+    { label: '전체 질의 횟수', value: fmtInt(totalQueries), unit: '건', delta: '10⁶ ~ 10¹² 규모, 4개 구간' },
+    { label: '누적 저장 앵커 수', value: '401', unit: '개', delta: 'anchor_cache.json에 영구 저장' },
+    {
+      label: `가장 극적인 가속 (${dramatic.label} 구간)`,
+      value: fmtMs(dFirst.elapsedMs) + ' → ' + fmtMs(dLast.elapsedMs),
+      unit: '',
+      delta: `${dramatic.speedup.toFixed(1)}배 빨라짐`
+    },
+  ];
+  const statsEl = document.getElementById('statTiles');
+  for (const t of statTiles) {
+    const div = document.createElement('div');
+    div.className = 'stat';
+    const l = document.createElement('div'); l.className = 'label'; l.textContent = t.label;
+    const v = document.createElement('div'); v.className = 'value'; v.textContent = t.value;
+    const d = document.createElement('div'); d.className = 'delta'; d.textContent = t.delta;
+    div.append(l, v, d);
+    statsEl.appendChild(div);
+  }
+
+  // ---------- small-multiple line facets ----------
+  const W = 400, H = 190, PAD_L = 42, PAD_R = 14, PAD_T = 16, PAD_B = 24;
+  const plotW = W - PAD_L - PAD_R, plotH = H - PAD_T - PAD_B;
+
+  const facetGrid = document.getElementById('facetGrid');
+  const bandLabels = Object.keys(DATA);
+
+  const niceMax = (m) => {
+    if (m <= 0) return 1;
+    const mag = Math.pow(10, Math.floor(Math.log10(m)));
+    const steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+    for (const s of steps) if (s * mag >= m) return s * mag;
+    return 10 * mag;
+  };
+
+  for (const label of bandLabels) {
+    const points = DATA[label];
+    const n = points.length;
+    const maxMs = niceMax(Math.max(...points.map(p => p.elapsedMs)) * 1.12);
+    const x = (i) => PAD_L + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+    const y = (v) => PAD_T + plotH - (v / maxMs) * plotH;
+
+    const card = document.createElement('div');
+    card.className = 'facet';
+
+    const title = document.createElement('div');
+    title.className = 'facet-title';
+    title.textContent = label + ' 번째 소수 구간';
+    const meta = document.createElement('div');
+    meta.className = 'facet-meta';
+    meta.textContent = `질의 ${n}회 · base ${fmtInt(points[0].target).slice(0, 4)}… 부근`;
+    card.append(title, meta);
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+    // gridlines (0, mid, max)
+    const ticks = [0, maxMs / 2, maxMs];
+    for (const t of ticks) {
+      const gy = y(t);
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', PAD_L); line.setAttribute('x2', W - PAD_R);
+      line.setAttribute('y1', gy); line.setAttribute('y2', gy);
+      line.setAttribute('class', t === 0 ? 'baseline' : 'grid-line');
+      svg.appendChild(line);
+      const lbl = document.createElementNS(svgNS, 'text');
+      lbl.setAttribute('x', PAD_L - 6); lbl.setAttribute('y', gy + 3);
+      lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('class', 'axis-label');
+      lbl.textContent = fmtMs(t);
+      svg.appendChild(lbl);
+    }
+
+    // line path
+    const path = document.createElementNS(svgNS, 'path');
+    let d = '';
+    points.forEach((p, i) => { d += (i === 0 ? 'M' : 'L') + x(i).toFixed(2) + ',' + y(p.elapsedMs).toFixed(2) + ' '; });
+    path.setAttribute('d', d.trim());
+    path.setAttribute('class', 'data-line');
+    svg.appendChild(path);
+
+    // dots + hit targets
+    points.forEach((p, i) => {
+      const dot = document.createElementNS(svgNS, 'circle');
+      dot.setAttribute('cx', x(i)); dot.setAttribute('cy', y(p.elapsedMs));
+      dot.setAttribute('r', i === 0 || i === n - 1 ? 4 : 3);
+      dot.setAttribute('class', 'dot');
+      svg.appendChild(dot);
+    });
+
+    // end labels (first + last value)
+    [0, n - 1].forEach((i) => {
+      const p = points[i];
+      const lbl = document.createElementNS(svgNS, 'text');
+      lbl.setAttribute('x', x(i)); lbl.setAttribute('y', Math.max(10, y(p.elapsedMs) - 8));
+      lbl.setAttribute('text-anchor', i === 0 ? 'start' : 'end');
+      lbl.setAttribute('class', 'end-label');
+      lbl.textContent = fmtMs(p.elapsedMs);
+      svg.appendChild(lbl);
+    });
+
+    // crosshair
+    const crosshair = document.createElementNS(svgNS, 'line');
+    crosshair.setAttribute('y1', PAD_T); crosshair.setAttribute('y2', H - PAD_B);
+    crosshair.setAttribute('class', 'crosshair');
+    svg.appendChild(crosshair);
+
+    // hit layer
+    const hit = document.createElementNS(svgNS, 'rect');
+    hit.setAttribute('x', PAD_L); hit.setAttribute('y', PAD_T);
+    hit.setAttribute('width', plotW); hit.setAttribute('height', plotH);
+    hit.setAttribute('class', 'hit');
+    svg.appendChild(hit);
+
+    const showTooltip = (i, evt) => {
+      const p = points[i];
+      crosshair.setAttribute('x1', x(i)); crosshair.setAttribute('x2', x(i));
+      crosshair.style.opacity = 1;
+      tooltip.innerHTML = '';
+      const val = document.createElement('div'); val.className = 't-val'; val.textContent = fmtMs(p.elapsedMs);
+      const r1 = document.createElement('div'); r1.className = 't-row';
+      const b1 = document.createElement('b'); b1.textContent = '#' + (i + 1) + '/' + n;
+      r1.append('질의 순서: ', b1);
+      const r2 = document.createElement('div'); r2.className = 't-row';
+      const b2 = document.createElement('b'); b2.textContent = fmtInt(p.localAnchorsBefore);
+      r2.append('질의 전 구간 내 앵커: ', b2, '개');
+      const r3 = document.createElement('div'); r3.className = 't-row';
+      const b3 = document.createElement('b'); b3.textContent = fmtInt(p.target);
+      r3.append('목표 인덱스: ', b3);
+      tooltip.append(val, r1, r2, r3);
+      const cardRect = card.getBoundingClientRect();
+      const rootRect = root.getBoundingClientRect();
+      const px = cardRect.left - rootRect.left + (x(i) / W) * cardRect.width;
+      const py = cardRect.top - rootRect.top + (y(p.elapsedMs) / H) * (cardRect.height - 40);
+      tooltip.style.left = px + 12 + 'px';
+      tooltip.style.top = Math.max(0, py - 10) + 'px';
+      tooltip.style.opacity = 1;
+    };
+    const hideTooltip = () => { tooltip.style.opacity = 0; crosshair.style.opacity = 0; };
+
+    hit.addEventListener('pointermove', (evt) => {
+      const rect = svg.getBoundingClientRect();
+      const px = ((evt.clientX - rect.left) / rect.width) * W;
+      let nearest = 0, best = Infinity;
+      points.forEach((p, i) => { const dist = Math.abs(x(i) - px); if (dist < best) { best = dist; nearest = i; } });
+      showTooltip(nearest, evt);
+    });
+    hit.addEventListener('pointerleave', hideTooltip);
+
+    card.appendChild(svg);
+    facetGrid.appendChild(card);
+  }
+
+  // ---------- summary bar chart ----------
+  const bw = 860, bh = 220, bPadL = 20, bPadR = 20, bPadT = 20, bBase = 178;
+  const barSvg = document.getElementById('barChart');
+  barSvg.setAttribute('viewBox', `0 0 ${bw} ${bh}`);
+  const maxSpeedup = niceMax(Math.max(...SUMMARIES.map(s => s.speedup)) * 1.15);
+  const slotW = (bw - bPadL - bPadR) / SUMMARIES.length;
+  const barW = 56;
+  const svgNS2 = 'http://www.w3.org/2000/svg';
+
+  const byv = (v) => bBase - (v / maxSpeedup) * (bBase - bPadT);
+  [0, maxSpeedup / 2, maxSpeedup].forEach((t) => {
+    const gy = byv(t);
+    const line = document.createElementNS(svgNS2, 'line');
+    line.setAttribute('x1', bPadL); line.setAttribute('x2', bw - bPadR);
+    line.setAttribute('y1', gy); line.setAttribute('y2', gy);
+    line.setAttribute('class', t === 0 ? 'baseline' : 'grid-line');
+    barSvg.appendChild(line);
+    const lbl = document.createElementNS(svgNS2, 'text');
+    lbl.setAttribute('x', bPadL - 6); lbl.setAttribute('y', gy + 3);
+    lbl.setAttribute('text-anchor', 'end'); lbl.setAttribute('class', 'axis-label');
+    lbl.textContent = t.toFixed(1) + '×';
+    barSvg.appendChild(lbl);
+  });
+
+  SUMMARIES.forEach((s, i) => {
+    const cx = bPadL + slotW * i + slotW / 2;
+    const barTop = byv(s.speedup);
+    const rect = document.createElementNS(svgNS2, 'rect');
+    rect.setAttribute('x', cx - barW / 2); rect.setAttribute('y', barTop);
+    rect.setAttribute('width', barW); rect.setAttribute('height', bBase - barTop);
+    rect.setAttribute('rx', 4); rect.setAttribute('class', 'bar-fill');
+    barSvg.appendChild(rect);
+
+    const val = document.createElementNS(svgNS2, 'text');
+    val.setAttribute('x', cx); val.setAttribute('y', barTop - 8);
+    val.setAttribute('text-anchor', 'middle'); val.setAttribute('class', 'bar-label');
+    val.textContent = s.speedup.toFixed(1) + '×';
+    barSvg.appendChild(val);
+
+    const cat = document.createElementNS(svgNS2, 'text');
+    cat.setAttribute('x', cx); cat.setAttribute('y', bBase + 18);
+    cat.setAttribute('text-anchor', 'middle'); cat.setAttribute('class', 'bar-cat');
+    cat.textContent = s.label;
+    barSvg.appendChild(cat);
+  });
+
+  // ---------- data table (toggle) ----------
+  const tableWrap = document.getElementById('tableWrap');
+  const tableToggle = document.getElementById('tableToggle');
+  let built = false;
+  const buildTable = () => {
+    const table = document.createElement('table');
+    const thead = document.createElement('thead');
+    const htr = document.createElement('tr');
+    ['구간', '#', '목표 인덱스', '소요 시간', '질의 전 앵커 수'].forEach((h) => {
+      const th = document.createElement('th'); th.textContent = h; htr.appendChild(th);
+    });
+    thead.appendChild(htr);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    for (const label of bandLabels) {
+      DATA[label].forEach((p, i) => {
+        const tr = document.createElement('tr');
+        const cells = [label, '#' + (i + 1), fmtInt(p.target), fmtMs(p.elapsedMs), fmtInt(p.localAnchorsBefore)];
+        cells.forEach((c, ci) => {
+          const td = document.createElement('td');
+          td.textContent = c;
+          if (ci === 3) td.className = 'num-strong';
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+    }
+    table.appendChild(tbody);
+    tableWrap.appendChild(table);
+    built = true;
+  };
+  tableToggle.addEventListener('click', () => {
+    if (!built) buildTable();
+    const hidden = tableWrap.style.display === 'none';
+    tableWrap.style.display = hidden ? 'block' : 'none';
+    tableToggle.textContent = hidden ? '표 닫기' : '표로 보기';
+  });
+})();
+</script>
+</body>
+</html>
